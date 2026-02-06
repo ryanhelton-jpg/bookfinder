@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BookFinder — Top Books by Genre from Multiple Sellers</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .book-card { transition: transform 0.2s, box-shadow 0.2s; }
+        .book-card:hover { transform: translateY(-4px); box-shadow: 0 12px 24px rgba(0,0,0,0.15); }
+        .genre-btn.active { background-color: #4f46e5; color: white; }
+    </style>
+</head>
+<body class="bg-amber-50 min-h-screen">
+    <div class="max-w-4xl mx-auto px-4 py-8">
+        <!-- Header -->
+        <div class="text-center mb-8">
+            <h1 class="text-4xl font-bold text-gray-900 mb-2">📚 BookFinder</h1>
+            <p class="text-xl text-gray-600">Find top books in any genre, compare across sellers</p>
+        </div>
+
+        <!-- Genre Selection -->
+        <div class="bg-white rounded-xl shadow-lg p-6 mb-8">
+            <h2 class="text-lg font-semibold mb-4">Choose a Genre</h2>
+            
+            <div class="flex flex-wrap gap-2 mb-6" id="genreButtons">
+                <button onclick="selectGenre('fiction')" class="genre-btn px-4 py-2 rounded-full border border-gray-300 hover:border-indigo-500 transition">Fiction</button>
+                <button onclick="selectGenre('mystery')" class="genre-btn px-4 py-2 rounded-full border border-gray-300 hover:border-indigo-500 transition">Mystery</button>
+                <button onclick="selectGenre('romance')" class="genre-btn px-4 py-2 rounded-full border border-gray-300 hover:border-indigo-500 transition">Romance</button>
+                <button onclick="selectGenre('science fiction')" class="genre-btn px-4 py-2 rounded-full border border-gray-300 hover:border-indigo-500 transition">Sci-Fi</button>
+                <button onclick="selectGenre('fantasy')" class="genre-btn px-4 py-2 rounded-full border border-gray-300 hover:border-indigo-500 transition">Fantasy</button>
+                <button onclick="selectGenre('thriller')" class="genre-btn px-4 py-2 rounded-full border border-gray-300 hover:border-indigo-500 transition">Thriller</button>
+                <button onclick="selectGenre('biography')" class="genre-btn px-4 py-2 rounded-full border border-gray-300 hover:border-indigo-500 transition">Biography</button>
+                <button onclick="selectGenre('self-help')" class="genre-btn px-4 py-2 rounded-full border border-gray-300 hover:border-indigo-500 transition">Self-Help</button>
+                <button onclick="selectGenre('business')" class="genre-btn px-4 py-2 rounded-full border border-gray-300 hover:border-indigo-500 transition">Business</button>
+                <button onclick="selectGenre('history')" class="genre-btn px-4 py-2 rounded-full border border-gray-300 hover:border-indigo-500 transition">History</button>
+                <button onclick="selectGenre('horror')" class="genre-btn px-4 py-2 rounded-full border border-gray-300 hover:border-indigo-500 transition">Horror</button>
+                <button onclick="selectGenre('young adult')" class="genre-btn px-4 py-2 rounded-full border border-gray-300 hover:border-indigo-500 transition">Young Adult</button>
+            </div>
+
+            <div class="flex gap-2">
+                <input type="text" id="customGenre" placeholder="Or type any genre..." 
+                       class="flex-1 p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                       onkeypress="if(event.key === 'Enter') searchCustomGenre()">
+                <button onclick="searchCustomGenre()" class="px-6 py-3 bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-700 transition">
+                    🔍 Search
+                </button>
+            </div>
+        </div>
+
+        <!-- Loading State -->
+        <div id="loading" class="hidden text-center py-12">
+            <div class="inline-block animate-spin text-4xl">📖</div>
+            <p class="mt-4 text-gray-600">Finding the best books...</p>
+        </div>
+
+        <!-- Results -->
+        <div id="results" class="hidden">
+            <h2 class="text-2xl font-bold mb-6">Top <span id="genreTitle"></span> Books</h2>
+            <div id="booksList" class="space-y-6">
+                <!-- Books will be inserted here -->
+            </div>
+        </div>
+
+        <!-- Empty State -->
+        <div id="emptyState" class="text-center py-12 text-gray-500">
+            <div class="text-6xl mb-4">📚</div>
+            <p>Select a genre above to discover great books</p>
+        </div>
+
+        <!-- Footer -->
+        <div class="text-center mt-12 text-gray-500 text-sm">
+            <p>Powered by Google Books API. Links to sellers help you compare prices.</p>
+        </div>
+    </div>
+
+    <script>
+        const GOOGLE_BOOKS_API = 'https://www.googleapis.com/books/v1/volumes';
+        
+        function selectGenre(genre) {
+            // Update active state
+            document.querySelectorAll('.genre-btn').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            searchBooks(genre);
+        }
+
+        function searchCustomGenre() {
+            const genre = document.getElementById('customGenre').value.trim();
+            if (genre) {
+                document.querySelectorAll('.genre-btn').forEach(btn => btn.classList.remove('active'));
+                searchBooks(genre);
+            }
+        }
+
+        async function searchBooks(genre) {
+            document.getElementById('loading').classList.remove('hidden');
+            document.getElementById('results').classList.add('hidden');
+            document.getElementById('emptyState').classList.add('hidden');
+
+            try {
+                // Search for popular books in the genre, sorted by relevance
+                const query = encodeURIComponent(`subject:${genre}`);
+                const response = await fetch(
+                    `${GOOGLE_BOOKS_API}?q=${query}&orderBy=relevance&maxResults=10&printType=books&langRestrict=en`
+                );
+                const data = await response.json();
+
+                if (data.items && data.items.length > 0) {
+                    // Filter and get top 5 with good data
+                    const books = data.items
+                        .filter(item => item.volumeInfo.imageLinks && item.volumeInfo.authors)
+                        .slice(0, 5);
+                    
+                    displayBooks(books, genre);
+                } else {
+                    displayNoResults(genre);
+                }
+            } catch (error) {
+                console.error('Error fetching books:', error);
+                displayError();
+            }
+
+            document.getElementById('loading').classList.add('hidden');
+        }
+
+        function displayBooks(books, genre) {
+            const container = document.getElementById('booksList');
+            document.getElementById('genreTitle').textContent = capitalizeWords(genre);
+            
+            container.innerHTML = books.map((book, index) => {
+                const info = book.volumeInfo;
+                const title = info.title;
+                const authors = info.authors ? info.authors.join(', ') : 'Unknown Author';
+                const description = info.description ? truncate(info.description, 200) : 'No description available.';
+                const thumbnail = info.imageLinks?.thumbnail?.replace('http:', 'https:') || '';
+                const publishedDate = info.publishedDate ? info.publishedDate.split('-')[0] : '';
+                const rating = info.averageRating ? `⭐ ${info.averageRating}` : '';
+                const pageCount = info.pageCount ? `${info.pageCount} pages` : '';
+                
+                // Generate seller links
+                const searchQuery = encodeURIComponent(`${title} ${authors}`);
+                const isbn = info.industryIdentifiers?.find(id => id.type === 'ISBN_13')?.identifier || 
+                            info.industryIdentifiers?.find(id => id.type === 'ISBN_10')?.identifier || '';
+
+                return `
+                    <div class="book-card bg-white rounded-xl shadow-lg p-6 flex gap-6">
+                        <div class="flex-shrink-0">
+                            <div class="text-2xl font-bold text-indigo-600 mb-2">#${index + 1}</div>
+                            ${thumbnail ? 
+                                `<img src="${thumbnail}" alt="${title}" class="w-24 h-36 object-cover rounded shadow">` :
+                                `<div class="w-24 h-36 bg-gray-200 rounded flex items-center justify-center text-3xl">📕</div>`
+                            }
+                        </div>
+                        <div class="flex-1">
+                            <h3 class="text-xl font-bold text-gray-900 mb-1">${escapeHtml(title)}</h3>
+                            <p class="text-gray-600 mb-2">by ${escapeHtml(authors)} ${publishedDate ? `(${publishedDate})` : ''}</p>
+                            <div class="flex gap-3 text-sm text-gray-500 mb-3">
+                                ${rating ? `<span>${rating}</span>` : ''}
+                                ${pageCount ? `<span>📄 ${pageCount}</span>` : ''}
+                            </div>
+                            <p class="text-gray-700 text-sm mb-4">${escapeHtml(description)}</p>
+                            
+                            <div class="flex flex-wrap gap-2">
+                                <a href="https://www.amazon.com/s?k=${searchQuery}" target="_blank" 
+                                   class="px-3 py-1.5 bg-orange-100 text-orange-700 rounded-lg text-sm font-medium hover:bg-orange-200 transition">
+                                    🛒 Amazon
+                                </a>
+                                <a href="https://www.barnesandnoble.com/s/${searchQuery}" target="_blank"
+                                   class="px-3 py-1.5 bg-green-100 text-green-700 rounded-lg text-sm font-medium hover:bg-green-200 transition">
+                                    📗 Barnes & Noble
+                                </a>
+                                <a href="https://bookshop.org/search?keywords=${searchQuery}" target="_blank"
+                                   class="px-3 py-1.5 bg-blue-100 text-blue-700 rounded-lg text-sm font-medium hover:bg-blue-200 transition">
+                                    📚 Bookshop.org
+                                </a>
+                                <a href="https://www.thriftbooks.com/browse/?b.search=${searchQuery}" target="_blank"
+                                   class="px-3 py-1.5 bg-purple-100 text-purple-700 rounded-lg text-sm font-medium hover:bg-purple-200 transition">
+                                    💜 ThriftBooks
+                                </a>
+                                <a href="https://libbyapp.com/search/query-${searchQuery}/page-1" target="_blank"
+                                   class="px-3 py-1.5 bg-pink-100 text-pink-700 rounded-lg text-sm font-medium hover:bg-pink-200 transition">
+                                    📱 Library (Libby)
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            document.getElementById('results').classList.remove('hidden');
+        }
+
+        function displayNoResults(genre) {
+            document.getElementById('booksList').innerHTML = `
+                <div class="text-center py-8 text-gray-500">
+                    <div class="text-4xl mb-4">🔍</div>
+                    <p>No books found for "${escapeHtml(genre)}". Try a different genre!</p>
+                </div>
+            `;
+            document.getElementById('genreTitle').textContent = capitalizeWords(genre);
+            document.getElementById('results').classList.remove('hidden');
+        }
+
+        function displayError() {
+            document.getElementById('booksList').innerHTML = `
+                <div class="text-center py-8 text-red-500">
+                    <div class="text-4xl mb-4">⚠️</div>
+                    <p>Something went wrong. Please try again.</p>
+                </div>
+            `;
+            document.getElementById('results').classList.remove('hidden');
+        }
+
+        function truncate(str, length) {
+            if (str.length <= length) return str;
+            return str.substring(0, length).trim() + '...';
+        }
+
+        function capitalizeWords(str) {
+            return str.replace(/\b\w/g, l => l.toUpperCase());
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    </script>
+</body>
+</html>
